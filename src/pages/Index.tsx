@@ -5,14 +5,17 @@ import { TopStocks } from "@/components/dashboard/TopStocks";
 import { PortfolioSummary } from "@/components/dashboard/PortfolioSummary";
 import { FinancialInsights } from "@/components/dashboard/FinancialInsights";
 import { Sparkles } from "lucide-react";
+import { useUserProfile } from "@/hooks/use-user-profile";
 
 const Index = () => {
+  const { userProfile } = useUserProfile();
+
   return (
     <PageLayout>
       <div className="mb-8 flex items-center gap-4">
         <Sparkles className="h-8 w-8 text-wealth-teal" />
         <div>
-          <h1 className="text-3xl font-bold">Welcome, John</h1>
+          <h1 className="text-3xl font-bold">Welcome, {userProfile.firstName}</h1>
           <p className="text-muted-foreground">
             Here's an overview of your finances and the latest market trends
           </p>

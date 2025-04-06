@@ -1,10 +1,202 @@
 
+import { useState } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { PieChart } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { searchStock } from "@/services/stockService";
+
+// Portfolio asset type
+interface PortfolioAsset {
+  symbol: string;
+  name: string;
+  shares: number;
+  price: number;
+  currentValue: number;
+  returnPct: number;
+  allocation: number;
+}
 
 const PortfolioPage = () => {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ symbol: string; name: string }[]>([]);
+  const [selectedStock, setSelectedStock] = useState<{ symbol: string; name: string } | null>(null);
+  const [shares, setShares] = useState("");
+  const [price, setPrice] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [portfolioAssets, setPortfolioAssets] = useState<PortfolioAsset[]>([
+    { 
+      symbol: "AAPL", 
+      name: "Apple Inc.", 
+      shares: 25, 
+      price: 177.58, 
+      currentValue: 4439.50,
+      returnPct: 12.5,
+      allocation: 8.4
+    },
+    {
+      symbol: "MSFT",
+      name: "Microsoft Corp.",
+      shares: 15,
+      price: 334.12,
+      currentValue: 5011.80,
+      returnPct: 18.7,
+      allocation: 9.5
+    },
+    {
+      symbol: "VTI",
+      name: "Vanguard Total Stock ETF",
+      shares: 80,
+      price: 252.35,
+      currentValue: 20188.00,
+      returnPct: 9.2,
+      allocation: 38.2
+    },
+    {
+      symbol: "BND",
+      name: "Vanguard Total Bond ETF",
+      shares: 120,
+      price: 72.45,
+      currentValue: 8694.00,
+      returnPct: -1.2,
+      allocation: 16.5
+    },
+    {
+      symbol: "TSLA",
+      name: "Tesla Inc.",
+      shares: 10,
+      price: 243.82,
+      currentValue: 2438.20,
+      returnPct: 32.4,
+      allocation: 4.6
+    },
+    {
+      symbol: "GOOGL",
+      name: "Alphabet Inc.",
+      shares: 30,
+      price: 132.97,
+      currentValue: 3989.10,
+      returnPct: 7.8,
+      allocation: 7.5
+    }
+  ]);
+  const { toast } = useToast();
+  
+  // Calculate the total portfolio value
+  const portfolioValue = portfolioAssets.reduce((sum, asset) => sum + asset.currentValue, 0);
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    setIsSearching(true);
+    try {
+      const results = await searchStock(searchQuery.trim());
+      setSearchResults(results);
+      
+      if (results.length === 0) {
+        toast({
+          title: "No results found",
+          description: "Try a different search term",
+        });
+      }
+    } catch (error) {
+      console.error("Search error:", error);
+      toast({
+        title: "Search failed",
+        description: "Please try again later",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleStockSelect = (stock: { symbol: string; name: string }) => {
+    setSelectedStock(stock);
+    setSearchResults([]);
+    
+    // Set a default price for the selected stock
+    const randomPrice = Math.round((20 + Math.random() * 480) * 100) / 100;
+    setPrice(randomPrice.toString());
+  };
+
+  const handleAddInvestment = () => {
+    if (!selectedStock || !shares || !price) {
+      toast({
+        title: "Missing information",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const sharesNum = parseFloat(shares);
+    const priceNum = parseFloat(price);
+    
+    if (isNaN(sharesNum) || sharesNum <= 0) {
+      toast({
+        title: "Invalid shares",
+        description: "Please enter a valid number of shares",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isNaN(priceNum) || priceNum <= 0) {
+      toast({
+        title: "Invalid price",
+        description: "Please enter a valid purchase price",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const currentValue = sharesNum * priceNum;
+    
+    // Generate a random return percentage between -15% and +35%
+    const returnPct = Math.round((Math.random() * 50 - 15) * 10) / 10;
+    
+    // Calculate new total portfolio value with the new asset
+    const newTotalValue = portfolioValue + currentValue;
+    
+    // Create the new asset
+    const newAsset: PortfolioAsset = {
+      symbol: selectedStock.symbol,
+      name: selectedStock.name,
+      shares: sharesNum,
+      price: priceNum,
+      currentValue,
+      returnPct,
+      allocation: Math.round((currentValue / newTotalValue) * 1000) / 10
+    };
+    
+    // Update allocations for all assets
+    const updatedAssets = [...portfolioAssets, newAsset].map(asset => ({
+      ...asset,
+      allocation: Math.round((asset.currentValue / newTotalValue) * 1000) / 10
+    }));
+    
+    // Add to portfolio
+    setPortfolioAssets(updatedAssets);
+    
+    // Reset form and close dialog
+    setSelectedStock(null);
+    setShares("");
+    setPrice("");
+    setSearchQuery("");
+    setIsDialogOpen(false);
+    
+    toast({
+      title: "Investment added",
+      description: `Added ${sharesNum} shares of ${selectedStock.symbol} to your portfolio`
+    });
+  };
+
   return (
     <PageLayout>
       <div className="mb-8 flex items-center gap-4">
@@ -21,10 +213,10 @@ const PortfolioPage = () => {
         <div>
           <h2 className="text-xl font-semibold">Your Holdings</h2>
           <p className="text-sm text-muted-foreground">
-            Current portfolio value: $52,845.72
+            Current portfolio value: ${portfolioValue.toFixed(2)}
           </p>
         </div>
-        <Button>Add Investment</Button>
+        <Button onClick={() => setIsDialogOpen(true)}>Add Investment</Button>
       </div>
 
       <div className="grid gap-6">
@@ -47,60 +239,19 @@ const PortfolioPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b py-3">
-                    <td className="py-4 font-medium">AAPL</td>
-                    <td>Apple Inc.</td>
-                    <td>25</td>
-                    <td>$177.58</td>
-                    <td>$4,439.50</td>
-                    <td className="text-wealth-green">+12.5%</td>
-                    <td>8.4%</td>
-                  </tr>
-                  <tr className="border-b py-3">
-                    <td className="py-4 font-medium">MSFT</td>
-                    <td>Microsoft Corp.</td>
-                    <td>15</td>
-                    <td>$334.12</td>
-                    <td>$5,011.80</td>
-                    <td className="text-wealth-green">+18.7%</td>
-                    <td>9.5%</td>
-                  </tr>
-                  <tr className="border-b py-3">
-                    <td className="py-4 font-medium">VTI</td>
-                    <td>Vanguard Total Stock ETF</td>
-                    <td>80</td>
-                    <td>$252.35</td>
-                    <td>$20,188.00</td>
-                    <td className="text-wealth-green">+9.2%</td>
-                    <td>38.2%</td>
-                  </tr>
-                  <tr className="border-b py-3">
-                    <td className="py-4 font-medium">BND</td>
-                    <td>Vanguard Total Bond ETF</td>
-                    <td>120</td>
-                    <td>$72.45</td>
-                    <td>$8,694.00</td>
-                    <td className="text-wealth-red">-1.2%</td>
-                    <td>16.5%</td>
-                  </tr>
-                  <tr className="border-b py-3">
-                    <td className="py-4 font-medium">TSLA</td>
-                    <td>Tesla Inc.</td>
-                    <td>10</td>
-                    <td>$243.82</td>
-                    <td>$2,438.20</td>
-                    <td className="text-wealth-green">+32.4%</td>
-                    <td>4.6%</td>
-                  </tr>
-                  <tr>
-                    <td className="py-4 font-medium">GOOGL</td>
-                    <td>Alphabet Inc.</td>
-                    <td>30</td>
-                    <td>$132.97</td>
-                    <td>$3,989.10</td>
-                    <td className="text-wealth-green">+7.8%</td>
-                    <td>7.5%</td>
-                  </tr>
+                  {portfolioAssets.map((asset, index) => (
+                    <tr key={`${asset.symbol}-${index}`} className="border-b py-3">
+                      <td className="py-4 font-medium">{asset.symbol}</td>
+                      <td>{asset.name}</td>
+                      <td>{asset.shares}</td>
+                      <td>${asset.price.toFixed(2)}</td>
+                      <td>${asset.currentValue.toFixed(2)}</td>
+                      <td className={asset.returnPct >= 0 ? "text-wealth-green" : "text-wealth-red"}>
+                        {asset.returnPct >= 0 ? "+" : ""}{asset.returnPct}%
+                      </td>
+                      <td>{asset.allocation}%</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -179,6 +330,122 @@ const PortfolioPage = () => {
           </Card>
         </div>
       </div>
+
+      {/* Add Investment Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Investment</DialogTitle>
+            <DialogDescription>
+              Add a new investment to your portfolio. Search for a stock by symbol or company name.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            {!selectedStock ? (
+              // Stock search form
+              <>
+                <div className="grid gap-2">
+                  <Label htmlFor="stock-search">Search Stock</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="stock-search"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Enter symbol or company name"
+                      className="flex-1"
+                    />
+                    <Button 
+                      onClick={handleSearch} 
+                      disabled={isSearching || !searchQuery.trim()}
+                    >
+                      {isSearching ? "Searching..." : "Search"}
+                    </Button>
+                  </div>
+                </div>
+                
+                {searchResults.length > 0 && (
+                  <div className="max-h-[200px] overflow-y-auto rounded-md border border-border p-1">
+                    {searchResults.map((result) => (
+                      <div
+                        key={result.symbol}
+                        className="cursor-pointer rounded-md p-2 hover:bg-accent"
+                        onClick={() => handleStockSelect(result)}
+                      >
+                        <div className="font-medium">{result.symbol}</div>
+                        <div className="text-xs text-muted-foreground">{result.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              // Selected stock form
+              <>
+                <div>
+                  <Label className="text-base font-semibold">Selected Stock</Label>
+                  <div className="mt-1 rounded-md bg-primary/5 p-3">
+                    <div className="font-medium">{selectedStock.symbol}</div>
+                    <div className="text-sm text-muted-foreground">{selectedStock.name}</div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="shares">Number of Shares</Label>
+                    <Input
+                      id="shares"
+                      type="number"
+                      value={shares}
+                      onChange={(e) => setShares(e.target.value)}
+                      placeholder="e.g. 10"
+                      min="0.01"
+                      step="0.01"
+                    />
+                  </div>
+                  
+                  <div className="grid gap-2">
+                    <Label htmlFor="price">Purchase Price ($)</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="e.g. 150.00"
+                      min="0.01"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+                
+                {shares && price && !isNaN(Number(shares)) && !isNaN(Number(price)) && (
+                  <div className="rounded-md bg-primary/5 p-3 text-right">
+                    <div className="text-sm text-muted-foreground">Total Value:</div>
+                    <div className="text-lg font-semibold">
+                      ${(Number(shares) * Number(price)).toFixed(2)}
+                    </div>
+                  </div>
+                )}
+                
+                <Button variant="outline" onClick={() => setSelectedStock(null)}>
+                  Change Stock
+                </Button>
+              </>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            {selectedStock && (
+              <Button onClick={handleAddInvestment}>
+                Add to Portfolio
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 };

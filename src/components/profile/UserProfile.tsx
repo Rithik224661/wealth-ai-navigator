@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -19,13 +19,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { toast } from "@/hooks/use-toast";
+import { useUserProfile } from "@/hooks/use-user-profile";
 
 export const UserProfile = () => {
-  const [riskTolerance, setRiskTolerance] = useState([5]);
-  const [investmentHorizon, setInvestmentHorizon] = useState("medium");
-  const [monthlyIncome, setMonthlyIncome] = useState("5000");
-  const [monthlyExpenses, setMonthlyExpenses] = useState("3500");
-  const [monthlySavings, setMonthlySavings] = useState("1500");
+  const { userProfile, updateUserProfile } = useUserProfile();
+  
+  const [riskTolerance, setRiskTolerance] = useState([userProfile.riskTolerance || 5]);
+  const [investmentHorizon, setInvestmentHorizon] = useState(userProfile.investmentHorizon || "medium");
+  const [monthlyIncome, setMonthlyIncome] = useState(userProfile.monthlyIncome || "5000");
+  const [monthlyExpenses, setMonthlyExpenses] = useState(userProfile.monthlyExpenses || "3500");
+  const [monthlySavings, setMonthlySavings] = useState(userProfile.monthlySavings || "1500");
+  const [firstName, setFirstName] = useState(userProfile.firstName || "John");
+  const [lastName, setLastName] = useState(userProfile.lastName || "Doe");
+  const [email, setEmail] = useState(userProfile.email || "john.doe@example.com");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [financialGoals, setFinancialGoals] = useState(userProfile.financialGoals || "retirement");
+  const [investmentCategories, setInvestmentCategories] = useState(userProfile.investmentCategories || "tech");
 
   const getRiskToleranceLabel = (value: number) => {
     if (value <= 2) return "Very Conservative";
@@ -33,6 +45,63 @@ export const UserProfile = () => {
     if (value <= 6) return "Moderate";
     if (value <= 8) return "Aggressive";
     return "Very Aggressive";
+  };
+  
+  const handleSaveFinancialInfo = () => {
+    updateUserProfile({
+      monthlyIncome,
+      monthlyExpenses, 
+      monthlySavings,
+      financialGoals
+    });
+    
+    toast({
+      title: "Financial information updated",
+      description: "Your financial details have been saved successfully",
+    });
+  };
+  
+  const handleSaveInvestmentPrefs = () => {
+    updateUserProfile({
+      riskTolerance: riskTolerance[0],
+      investmentHorizon,
+      investmentCategories
+    });
+    
+    toast({
+      title: "Investment preferences updated",
+      description: "Your investment preferences have been saved successfully",
+    });
+  };
+  
+  const handleSaveAccountSettings = () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Password mismatch",
+        description: "New password and confirmation do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    updateUserProfile({
+      firstName,
+      lastName,
+      email
+    });
+    
+    // In a real app, this would handle password update via API
+    if (newPassword) {
+      // Password update logic would go here
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
+    
+    toast({
+      title: "Account settings updated",
+      description: "Your account information has been saved successfully",
+    });
   };
 
   return (
@@ -88,7 +157,10 @@ export const UserProfile = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="financial-goals">Financial Goals</Label>
-                <Select defaultValue="retirement">
+                <Select
+                  value={financialGoals}
+                  onValueChange={setFinancialGoals}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a goal" />
                   </SelectTrigger>
@@ -101,7 +173,9 @@ export const UserProfile = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button className="w-full">Save Financial Information</Button>
+              <Button className="w-full" onClick={handleSaveFinancialInfo}>
+                Save Financial Information
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -169,7 +243,10 @@ export const UserProfile = () => {
                 <Label htmlFor="investment-categories">
                   Preferred Investment Categories
                 </Label>
-                <Select defaultValue="tech">
+                <Select 
+                  value={investmentCategories}
+                  onValueChange={setInvestmentCategories}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select preferred categories" />
                   </SelectTrigger>
@@ -183,7 +260,9 @@ export const UserProfile = () => {
                 </Select>
               </div>
 
-              <Button className="w-full">Save Investment Preferences</Button>
+              <Button className="w-full" onClick={handleSaveInvestmentPrefs}>
+                Save Investment Preferences
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -205,12 +284,18 @@ export const UserProfile = () => {
                   <Input
                     id="first-name"
                     placeholder="John"
-                    defaultValue="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="last-name">Last Name</Label>
-                  <Input id="last-name" placeholder="Doe" defaultValue="Doe" />
+                  <Input 
+                    id="last-name" 
+                    placeholder="Doe" 
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -220,7 +305,8 @@ export const UserProfile = () => {
                   id="email"
                   type="email"
                   placeholder="john.doe@example.com"
-                  defaultValue="john.doe@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
 
@@ -230,6 +316,8 @@ export const UserProfile = () => {
                   id="current-password"
                   type="password"
                   placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
                 />
               </div>
 
@@ -240,6 +328,8 @@ export const UserProfile = () => {
                     id="new-password"
                     type="password"
                     placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -248,11 +338,15 @@ export const UserProfile = () => {
                     id="confirm-password"
                     type="password"
                     placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                   />
                 </div>
               </div>
 
-              <Button className="w-full">Save Account Settings</Button>
+              <Button className="w-full" onClick={handleSaveAccountSettings}>
+                Save Account Settings
+              </Button>
             </div>
           </CardContent>
         </Card>
